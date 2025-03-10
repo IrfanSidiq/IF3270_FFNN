@@ -30,3 +30,14 @@ class ReLU(ActivationFunction):
     @staticmethod
     def backward(x: np.ndarray):
         return (x > 0).astype(float)
+
+
+class Sigmoid(ActivationFunction):
+    @staticmethod
+    def forward(x: np.ndarray):
+        return 1 / (1 + np.exp(-x))
+    
+    @staticmethod
+    def backward(x: np.ndarray):
+        sigmoid_x = Sigmoid.forward(x)
+        return sigmoid_x * (1 - sigmoid_x)

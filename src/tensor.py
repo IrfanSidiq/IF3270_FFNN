@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, List
 import numpy as np
 
 from src.activation_function import ActivationFunction
@@ -8,24 +8,24 @@ from src.loss_function import LossFunction
 class Tensor:
     data: np.ndarray
     gradient: np.ndarray
-    __children: set
+    __children: List
     __op: str
     __backward: Callable[[], None]
-    type: str
+    tensor_type: str
 
-    def __init__(self, data: np.ndarray, __children: tuple = (), __op: str = "", tensor_type: str = ""):
+    def __init__(self, data: np.ndarray, __children: List["Tensor"] = [], __op: str = "", tensor_type: str = ""):
         if not isinstance(data, np.ndarray):
             raise TypeError(f"Expected np.ndarray, but got {type(data).__name__} instead")
         
-        self.data = data
+        self.data = data.astype(float)
         self.gradient = np.zeros_like(self.data, dtype=float)
-        self.__children = set(__children)
+        self.__children = __children
         self.__op = __op
         self.__backward = lambda: None
         self.tensor_type = tensor_type
 
     def __repr__(self):
-        return f"Value: {self.data}, Gradient: {self.gradient}"
+        return f"Value: {self.data}, Gradient: {self.gradient}, Op: {self.__op if self.__op else "None"}"
 
     def __add__(self, other):
         if not isinstance(other, Tensor):
@@ -37,7 +37,7 @@ class Tensor:
         if self.data.shape != other.data.shape:
             raise ValueError(f"Values of different shapes cannot be operated: {self.data.shape} and {other.data.shape}")
 
-        res = Tensor(self.data + other.data, (self, other), "+")
+        res = Tensor(self.data + other.data, [self, other], "+")
 
         def __backward():
             self.gradient += res.gradient
@@ -55,7 +55,7 @@ class Tensor:
         if self.data.shape != other.data.shape:
             raise ValueError(f"Values of different shapes cannot be operated: {self.data.shape} and {other.data.shape}")
 
-        res = Tensor(self.data * other.data, (self, other), "*")
+        res = Tensor(self.data * other.data, [self, other], "*")
 
         def __backward():
             self.gradient += other.data * res.gradient
@@ -68,7 +68,7 @@ class Tensor:
         if not isinstance(other, int) and not isinstance(other, float):
             raise TypeError(f"Expected int or float, but got {type(other).__name__} instead")
 
-        res = Tensor(self.data ** other, (self, ), f'**{other}')
+        res = Tensor(self.data ** other, [self], f'**{other}')
 
         def __backward():
             self.grad += (other * self.data**(other - 1)) * res.gradient
@@ -121,9 +121,18 @@ class Tensor:
     def __array__(self, dtype=None):
         return self.data if dtype is None else self.data.astype(dtype)
 
+    def sum(self):
+        res = Tensor(np.sum(self.data).reshape(1), [self], "sum")
+
+        def __backward():
+            self.gradient += res.gradient[0]
+        
+        res.__backward = __backward
+        return res
+
     def compute_activation(self, activation_function: ActivationFunction):
         res = activation_function.forward(self.data)
-        res = Tensor(res, (self,), type(activation_function).__name__)
+        res = Tensor(res, [self], activation_function.__name__)
 
         def __backward():
             self.gradient += activation_function.backward(self.data) * res.gradient
@@ -131,15 +140,32 @@ class Tensor:
         res.__backward = __backward
         return res
 
-    def compute_loss(self, y_pred: "Tensor", loss_function: LossFunction):
-        res = loss_function.forward(self.data, y_pred.data)
-        res = Tensor(np.array(res), (self,), type(loss_function).__name__)
+    def compute_loss(self, y_true: np.ndarray, loss_function: LossFunction):
+        res = loss_function.forward(y_true, self.data)
+        res = Tensor(np.array([res]), [self], loss_function.__name__)
 
         def __backward():
-            self.gradient += loss_function.backward(self.data, y_pred.data) * res.gradient
+            self.gradient += loss_function.backward(y_true, self.data) * res.gradient[0]
         
         res.__backward = __backward
         return res
+
+    def concat(self, tensors: List["Tensor"]):
+        combined_data = self.data.copy()
+        for tensor in tensors:
+            combined_data = np.append(combined_data, tensor.data.copy())
+        
+        tensors.insert(0, self)
+        res = Tensor(combined_data, tensors, "concat")
+
+        def __backward():
+            i = 0
+            for tensor in res.__children:
+                tensor.gradient += res.gradient[i]
+                i = (i + 1) % len(res.gradient)
+
+        res.__backward = __backward
+        return res 
     
     def backward(self):
         topo = []
