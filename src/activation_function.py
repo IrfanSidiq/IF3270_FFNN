@@ -5,10 +5,16 @@ import numpy as np
 class ActivationFunction(ABC):
     @abstractmethod
     def forward(x: np.ndarray):
+        """
+        Computes activation output using activation function.
+        """
         pass
 
     @abstractmethod
     def backward(x: np.ndarray):
+        """
+        Computes gradient of activation function.
+        """
         pass
 
 

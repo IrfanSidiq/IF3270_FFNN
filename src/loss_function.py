@@ -5,10 +5,16 @@ import numpy as np
 class LossFunction(ABC):
     @abstractmethod
     def forward(y_true: np.ndarray, y_pred: np.ndarray):
+        """
+        Computes loss value using loss function.
+        """
         pass
 
     @abstractmethod
     def backward(y_true: np.ndarray, y_pred: np.ndarray):
+        """
+        Computes gradient of loss function.
+        """
         pass
 
 

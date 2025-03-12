@@ -4,7 +4,10 @@ import numpy as np
 
 class WeightInitializer(ABC):
     @abstractmethod
-    def initialize_weight(neuron_size: int, input_size: int):
+    def initialize_weight(neuron_size: int, input_size: int) -> np.ndarray:
+        """
+        Initializes weight vector and returns it as a NumPy array.
+        """
         pass
 
 
