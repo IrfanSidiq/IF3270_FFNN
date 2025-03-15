@@ -26,4 +26,24 @@ class MeanSquaredError(LossFunction):
     @staticmethod
     def backward(y_true: np.ndarray, y_pred: np.ndarray):
         n = y_true.shape[0]
-        return (2 / n) * (y_pred - y_true)
+        return -2 * np.mean(y_pred - y_true)
+    
+class BinaryCrossEntropy(LossFunction):
+    @staticmethod
+    def forward(y_true: np.ndarray, y_pred: np.ndarray):
+        return -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
+    
+    @staticmethod
+    def backward(y_true: np.ndarray, y_pred: np.ndarray):
+        n = y_true.shape[0]
+        return -np.mean((y_pred - y_true) / (y_pred * (1 - y_pred)))
+    
+class CategoricalCrossEntropy(LossFunction):
+    @staticmethod
+    def forward(y_true: np.ndarray, y_pred: np.ndarray):
+        return -np.mean(y_true * np.log(y_pred))
+    
+    @staticmethod
+    def backward(y_true: np.ndarray, y_pred: np.ndarray):
+        n = y_true.shape[0]
+        return -np.mean(y_true / y_pred)
