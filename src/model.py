@@ -3,8 +3,9 @@ import numpy as np
 import math
 
 from src.tensor import Tensor
-from src.layer import Layer
-from src.loss_function import LossFunction, MeanSquaredError
+from src.layer import Layer, Dense
+from src.loss_function import LossFunction, MeanSquaredError, BinaryCrossEntropy, CategoricalCrossEntropy
+from src.activation_function import Softmax
 from src.optimizer import Optimizer, StochasticGradientDescent
 
 
@@ -21,10 +22,10 @@ class FFNN:
         if not layers[0].weights:
             raise ValueError(
                 "Input size of the first layer must be specified.\n"
-                "Example: FFNN(["
+                "Example: FFNN([\n"
                 "   Dense(16, activation=\"relu\", kernel_initializer=\"he_normal\", input_size=4),\n"
                 "   Dense(32, activation=\"sigmoid\", kernel_initializer=\"he_normal\")\n"
-                "])"
+                "])\n"
             )
 
         self.layers = layers
@@ -49,21 +50,29 @@ class FFNN:
         Initializes optimizer and loss function of the network.
         """
         match optimizer:
+            case opt if isinstance(opt, Optimizer):
+                self.optimizer = opt 
             case "sgd":
-                self.optimizer = StochasticGradientDescent(self.get_parameters())
+                self.optimizer = StochasticGradientDescent()
             case _:
                 raise ValueError(
                     f"Optimizer '{optimizer}' is not supported. "
                     "Supported parameters: 'sgd', blablablabla"
                 )
         
+        self.optimizer.set_parameters(self.get_parameters())
+        
         match loss:
             case "mean_squared_error":
                 self.loss_function = MeanSquaredError
+            case "binary_crossentropy":
+                self.loss_function = BinaryCrossEntropy
+            case "categorical_crossentropy":
+                self.loss_function = CategoricalCrossEntropy
             case _:
                 raise ValueError(
                     f"Loss function '{optimizer}' is not supported. "
-                    "Supported parameters: 'mean_squared_error', blablablabla"
+                    "Supported parameters: 'mean_squared_error', 'binary_crossentropy', 'categorical_crossentropy'"
                 )
 
     def forward(self, input: Tensor) -> Tensor:
@@ -72,29 +81,41 @@ class FFNN:
         """
         x = input
         for layer in self.layers:
+            x = x.add_x0()
             x = layer.forward(x)
         
         self.output = x
-        return x
+        self.output.tensor_type = "output"
+        return x.data
     
     def backward(self, y_true: np.ndarray) -> None:
         """
         Computes gradient through backpropagation.
         """
         if not self.output:
-            raise ValueError("Forwardpropagation has not been done yet!")
+            raise RuntimeError("Forwardpropagation has not been done yet! Initiate forwardpropagation using forward().")
         elif y_true.shape[0] != self.output.data.shape[0]:
             raise ValueError(f"y_true and y_pred have different dimensions: {y_true.shape[0]} and {self.output.data.shape[0]}")
+
+        if self.layers[-1].activation_function is Softmax:            
+            def __backward():
+                self.output._Tensor__children[0].gradient += self.output.data - y_true
+
+            self.output._Tensor__backward = __backward
 
         loss = self.output.compute_loss(y_true, self.loss_function)
         loss.backward()
     
     def fit(self, X_train: np.ndarray, y_train: np.ndarray, epochs: int = 10, batch_size: int = 32, validation_data: tuple = ()):
         """
-        Trains the model with given training data. Input must be a 2D NumPy array, containing multiple data records for training.
+        Trains the model with given training data.
+        Input must be a 2D NumPy array, containing one or multiple data records for training.
         """
         if X_train.shape[0] != y_train.shape[0]:
             raise ValueError(f"X_train and y_train must have the same number of entries!")
+        
+        if self.optimizer is None:
+            raise RuntimeError(f"Model has not been compiled yet! Compile the model using compile().")
         
         batches = []
         for i in range(math.ceil(X_train.shape[0] / batch_size)):
@@ -109,13 +130,19 @@ class FFNN:
                 self.optimizer.zero_grad()
                 for sample in batch:
                     self.forward(Tensor(sample[0])) # X
-                    self.backward(Tensor(sample[1])) # y
+                    self.backward(sample[1]) # y
                 
                 self.optimizer.step()
+            
+            if validation_data:
+                self.output = Tensor(np.array(self.predict(validation_data[0]))) # X
+                loss = self.output.compute_loss(validation_data[1], self.loss_function) # y
+                print(f"Epoch {_+1}, Validation Loss: {loss.data[0]}")
         
     def predict(self, X_test: np.ndarray):
         """
-        Predicts the class of given test data. Input must be a 2D NumPy array, containing multiple data records to be predicted.
+        Predicts the class of given test data.
+        Input must be a 2D NumPy array, containing multiple data records to be predicted.
         """
         y_pred = []
         for sample in X_test:
@@ -123,4 +150,28 @@ class FFNN:
         
         return y_pred
     
-    
+    def evaluate(self, X_test: np.ndarray, y_test: np.ndarray):
+        """
+        Evaluates the model performance on the test set.
+        Automatically detects if it's classification or regression based on loss function.
+        """
+        y_pred = self.predict(X_test)
+        loss = self.loss_function.forward(y_test, y_pred)
+        
+        if self.loss_function is MeanSquaredError: 
+            metric = np.mean((y_pred - y_test) ** 2)
+            metric_name = "MSE"
+        elif self.loss_function is CategoricalCrossEntropy:
+            y_pred_labels = np.argmax(y_pred, axis=1)
+            y_test_labels = np.argmax(y_test, axis=1)
+            metric = np.mean(y_pred_labels == y_test_labels)
+            metric_name = "Accuracy"
+        elif self.loss_function is BinaryCrossEntropy:
+            y_pred_labels = (y_pred > 0.5).astype(int)
+            metric = np.mean(y_pred_labels == y_test)
+            metric_name = "Accuracy"
+        else:
+            raise ValueError("Unknown loss function type.")
+
+        print(f"Loss: {loss:.4f}, {metric_name}: {metric:.4f}")
+        return loss, metric
