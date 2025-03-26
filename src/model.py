@@ -1,6 +1,7 @@
 from typing import List
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 from src.tensor import Tensor
 from src.layer import Layer
@@ -123,4 +124,90 @@ class FFNN:
         
         return y_pred
     
-    
+    def __get_node_of_layers(self) -> List[int]:
+        """
+        Return a list of the number of nodes in each layer, including the bias node
+        """
+        n_layers = []
+        n_layers.append(len(self.layers[0].weights[0]))
+
+        for i in range(len(self.layers)):
+            n_layers.append(len(self.layers[i].weights) + 1)
+
+        return n_layers
+
+    def __repr__(self):
+        """
+        Visualizing the neural network
+        """
+        list_of_layer = self.__get_node_of_layers()
+        width = len(list_of_layer)
+        height = max(list_of_layer) * 1.5
+
+        _, ax = plt.subplots(figsize=(width,height))
+        ax.axis('off')
+        ax.set_aspect('equal')
+
+        radius = 0.5 / (self.max_nodes ** 0.3)
+        font_size = 16 / (self.max_nodes ** 0.2)
+        layer_spacing = 2.5 / (self.num_layers ** 0.5)
+
+        for i, layer in enumerate(list_of_layer):
+            for j in range(layer):
+                node = plt.Circle(
+                    (i * layer_spacing, -(j - layer / 2)),
+                    radius=radius,
+                    color = plt.cm.tab10(i%10),
+                    fill=True,
+                    zorder = 2
+                )
+                ax.add_patch(node)
+
+                label = f'B{i+1}' if (j == layer-1 and i != width - 1) else f'L{i+1}-{j+1}' 
+                ax.text(
+                    i * layer_spacing,
+                    -(j - layer / 2),
+                    label,
+                    ha='center',
+                    va='center',
+                    color='white',
+                    font_size=font_size,
+                    zorder = 3
+                )
+
+        for i in range(width - 1):
+            for j in range(list_of_layer[i]):
+                for k in range(list_of_layer[i+1] - 1):
+                    if (i + 1 != width - 1) and (k == list_of_layer[i+1] - 1):
+                        continue
+
+                    x_start = i * layer_spacing
+                    y_start = -(j - list_of_layer[i] / 2)
+                    x_finish = (i+1) * layer_spacing
+                    y_finish = -(k - list_of_layer[i+1] / 2)
+
+                    ax.plot(
+                        [x_start,x_finish],
+                        [y_start,y_finish],
+                        color='black',
+                        zorder=1
+                    )
+
+        plt.xlim(-1, (width - 1) * layer_spacing + 1)
+        plt.ylim(-max(list_of_layer)/2 - 0.5, max(list_of_layer) / 2 + 0.5)
+        plt.tight_layout()
+        plt.show()
+
+        weight_str = "Weights\n"
+        weight_str += "W[n][m] indicating weight value from node n to node m\n\n"
+        for i in range(len(self.layers)):
+            w = self.layers[i].weights
+            for j in range(len(w)):
+                for k in range(len(w[j])):
+                    source = f'B{i+1}' if k == 0 else f'L{i+1}-{k}'
+                    dest = f'L{i+2}-{j+1}'
+                    weight_str += f'W[{source}][{dest}] = {w[j][k]}\n'
+                weight_str += "\n"
+            weight_str += "\n"
+
+        return weight_str
