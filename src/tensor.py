@@ -1,4 +1,5 @@
-from typing import Callable, List
+from __future__ import annotations
+from typing import Callable, List, Union
 import numpy as np
 
 from src.activation_function import ActivationFunction
@@ -8,13 +9,13 @@ from src.loss_function import LossFunction
 class Tensor:
     data: np.ndarray
     gradient: np.ndarray
-    __children: List["Tensor"]
+    __children: List[Tensor]
     __op: str
     __backward: Callable[[], None]
     requires_grad: bool
     tensor_type: str
 
-    def __init__(self, data: np.ndarray, __children: List["Tensor"] = [], __op: str = "", tensor_type: str = "") -> None:
+    def __init__(self, data: np.ndarray, __children: List[Tensor] = [], __op: str = "", tensor_type: str = "") -> None:
         if not isinstance(data, np.ndarray):
             raise TypeError(f"Expected np.ndarray, but got {type(data).__name__} instead")
         
@@ -33,109 +34,15 @@ class Tensor:
             f"{(', Type: ' + self.tensor_type) if self.tensor_type else ''}"
         )
 
-    def add_x0(self) -> "Tensor":
+    def add_x0(self) -> Tensor:
         """
         Adds x0 = 1 to the tensor. Used for preparing output of layer-i as an input to the layer-i+1.
         """
         self.data = np.concatenate([np.array([1]), self.data])
         self.gradient = np.concatenate([np.array([0]), self.gradient])
         return self
-
-    def __add__(self, other: "Tensor" | np.ndarray) -> "Tensor":
-        if not isinstance(other, Tensor):
-            if not isinstance(other, np.ndarray):
-                raise TypeError(f"Expected Tensor or np.ndarray, but got {type(other).__name__} instead")
-                
-            other = Tensor(other)
-
-        if self.data.shape != other.data.shape:
-            raise ValueError(f"Values of different shapes cannot be operated: {self.data.shape} and {other.data.shape}")
-
-        res = Tensor(self.data + other.data, [self, other], "+")
-
-        def __backward():
-            self.gradient += res.gradient
-            other.gradient += res.gradient
-
-        res.__backward = __backward
-        return res
     
-    def __mul__(self, other: "Tensor" | np.ndarray) -> "Tensor":
-        if isinstance(other, np.ndarray):
-            other = Tensor(other)
-        elif isinstance(other, (float, int)):
-            other = Tensor(np.array(other))
-        
-        if self.data.shape != other.data.shape:
-            raise ValueError(f"Values of different shapes cannot be operated: {self.data.shape} and {other.data.shape}")
-
-        res = Tensor(self.data * other.data, [self, other], "*")
-
-        def __backward():
-            self.gradient += other.data * res.gradient
-            other.gradient += self.data * res.gradient
-
-        res.__backward = __backward
-        return res
-    
-    def __pow__(self, other: "Tensor" | np.ndarray) -> "Tensor":
-        if not isinstance(other, int) and not isinstance(other, float):
-            raise TypeError(f"Expected int or float, but got {type(other).__name__} instead")
-
-        res = Tensor(self.data ** other, [self], f'**{other}')
-
-        def __backward():
-            self.gradient += (other * self.data**(other - 1)) * res.gradient
-        
-        res.__backward = __backward
-        return res
-
-    def __neg__(self) -> "Tensor":
-        return Tensor(-self.data, self.__children, self.__op)
-
-    def __radd__(self, other: "Tensor" | np.ndarray) -> "Tensor":
-        return self + other
-
-    def __iadd__(self, other: "Tensor") -> "Tensor":
-        result = self + other
-        self.data = result.data
-        return self
-
-    def __sub__(self, other: "Tensor" | np.ndarray) -> "Tensor":
-        return self + (-other)
-
-    def __rsub__(self, other: "Tensor" | np.ndarray) -> "Tensor":
-        return other + (-self)
-    
-    def __isub__(self, other: "Tensor" | np.ndarray) -> "Tensor":
-        result = self - other
-        self.data = result.data
-        return self
-
-    def __rmul__(self, other: "Tensor" | np.ndarray) -> "Tensor":
-        return self * other
-    
-    def __imul__(self, other: "Tensor" | np.ndarray) -> "Tensor":
-        result = self * other
-        self.data = result.data
-        return self
-
-    def __truediv__(self, other: "Tensor" | np.ndarray) -> "Tensor":
-        if isinstance(other, Tensor):
-            other.data = other.data.astype(float)
-        
-        if isinstance(other, np.ndarray):
-            other = other.astype(float)
-
-        return self * other**-1
-
-    def __rtruediv__(self, other: "Tensor" | np.ndarray) -> "Tensor":
-        return other * self**-1
-    
-    def __array__(self, dtype=None) -> np.ndarray:
-        return self.data if dtype is None else self.data.astype(dtype)
-
-    def sum(self) -> "Tensor":
+    def sum(self) -> Tensor:
         """
         Computes the sum of 1D tensor elements.
         """
@@ -147,7 +54,7 @@ class Tensor:
         res.__backward = __backward
         return res
 
-    def compute_activation(self, activation_function: ActivationFunction) -> "Tensor":
+    def compute_activation(self, activation_function: ActivationFunction) -> Tensor:
         """
         Computes the activation output using given activation function.
         """
@@ -160,7 +67,7 @@ class Tensor:
         res.__backward = __backward
         return res
 
-    def compute_loss(self, y_true: np.ndarray, loss_function: LossFunction) -> "Tensor":
+    def compute_loss(self, y_true: np.ndarray, loss_function: LossFunction) -> Tensor:
         """
         Computes the loss value using given loss function and y_true.
         """
@@ -173,7 +80,7 @@ class Tensor:
         res.__backward = __backward
         return res
 
-    def concat(self, tensors: List["Tensor"]) -> "Tensor":
+    def concat(self, tensors: List[Tensor]) -> Tensor:
         """
         Concats multiple 1D tensors into one long 1D tensor. Used for combining outputs of multiple neurons into one output.
         """
@@ -211,5 +118,99 @@ class Tensor:
 
         self.gradient = np.ones_like(self.data, dtype=float)
         for v in reversed(topo):
-            if v.require_grad:
+            if v.requires_grad:
                 v.__backward()
+
+    def __add__(self, other: Tensor | np.ndarray) -> Tensor:
+        if not isinstance(other, Tensor):
+            if not isinstance(other, np.ndarray):
+                raise TypeError(f"Expected Tensor or np.ndarray, but got {type(other).__name__} instead")
+                
+            other = Tensor(other)
+
+        if self.data.shape != other.data.shape:
+            raise ValueError(f"Values of different shapes cannot be operated: {self.data.shape} and {other.data.shape}")
+
+        res = Tensor(self.data + other.data, [self, other], "+")
+
+        def __backward():
+            self.gradient += res.gradient
+            other.gradient += res.gradient
+
+        res.__backward = __backward
+        return res
+    
+    def __mul__(self, other: Tensor | np.ndarray) -> Tensor:
+        if isinstance(other, np.ndarray):
+            other = Tensor(other)
+        elif isinstance(other, (float, int)):
+            other = Tensor(np.array(other))
+        
+        if self.data.shape != other.data.shape:
+            raise ValueError(f"Values of different shapes cannot be operated: {self.data.shape} and {other.data.shape}")
+
+        res = Tensor(self.data * other.data, [self, other], "*")
+
+        def __backward():
+            self.gradient += other.data * res.gradient
+            other.gradient += self.data * res.gradient
+
+        res.__backward = __backward
+        return res
+    
+    def __pow__(self, other: int | float) -> Tensor:
+        if not isinstance(other, int) and not isinstance(other, float):
+            raise TypeError(f"Expected int or float, but got {type(other).__name__} instead")
+
+        res = Tensor(self.data ** other, [self], f'**{other}')
+
+        def __backward():
+            self.gradient += (other * self.data**(other - 1)) * res.gradient
+        
+        res.__backward = __backward
+        return res
+
+    def __neg__(self) -> Tensor:
+        return Tensor(-self.data, self.__children, self.__op)
+
+    def __radd__(self, other: Tensor | np.ndarray) -> Tensor:
+        return self + other
+
+    def __iadd__(self, other: Tensor) -> Tensor:
+        result = self + other
+        self.data = result.data
+        return self
+
+    def __sub__(self, other: Tensor | np.ndarray) -> Tensor:
+        return self + (-other)
+
+    def __rsub__(self, other: Tensor | np.ndarray) -> Tensor:
+        return other + (-self)
+    
+    def __isub__(self, other: Tensor | np.ndarray) -> Tensor:
+        result = self - other
+        self.data = result.data
+        return self
+
+    def __rmul__(self, other: Tensor | np.ndarray) -> Tensor:
+        return self * other
+    
+    def __imul__(self, other: Tensor | np.ndarray) -> Tensor:
+        result = self * other
+        self.data = result.data
+        return self
+
+    def __truediv__(self, other: Tensor | np.ndarray) -> Tensor:
+        if isinstance(other, Tensor):
+            other.data = other.data.astype(float)
+        
+        if isinstance(other, np.ndarray):
+            other = other.astype(float)
+
+        return self * other**-1
+
+    def __rtruediv__(self, other: Tensor | np.ndarray) -> Tensor:
+        return other * self**-1
+    
+    def __array__(self, dtype=None) -> np.ndarray:
+        return self.data if dtype is None else self.data.astype(dtype)

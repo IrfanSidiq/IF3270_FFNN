@@ -59,10 +59,10 @@ class HyperbolicTangent(ActivationFunction):
         return np.power((2 / (np.exp(x) - np.exp(-x))), 2)
 
 class Softmax(ActivationFunction):
-    @staticmethod
     def forward(x: np.ndarray) -> np.ndarray:
-        sum_e = np.exp(x).sum()
-        return np.exp(x) / sum_e
+        x_shifted = x - np.max(x)
+        sum_e = np.exp(x_shifted).sum()
+        return np.exp(x_shifted) / sum_e
     
     @staticmethod
     def backward(x: np.ndarray) -> np.ndarray:
