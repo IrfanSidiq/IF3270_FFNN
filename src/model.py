@@ -182,10 +182,10 @@ class FFNN:
         Return a list of the number of nodes in each layer, including the bias node
         """
         n_layers = []
-        n_layers.append(len(self.layers[0].weights[0]))
+        n_layers.append(len(self.layers[0].weights[0].data))
 
         for i in range(len(self.layers)):
-            n_layers.append(len(self.layers[i].weights) + 1)
+            n_layers.append(len(self.layers[i].get_neuron_size()) + 1)
 
         return n_layers
 
@@ -251,17 +251,21 @@ class FFNN:
         plt.tight_layout()
         plt.show()
 
-        weight_str = "Weights\n"
-        weight_str += "W[n][m] indicating weight value from node n to node m\n\n"
+        print("Weights")
+        print("W[n][m] indicates weight value from node n to node m")
         for i in range(len(self.layers)):
-            w = self.layers[i].weights
-            for j in range(len(w)):
-                for k in range(len(w[j])):
+            l = self.layers[i]
+            for j in range(len(l.weights)):
+                w = l.weights[j].data
+                for k in range(len(w)):
                     source = f'B{i+1}' if k == 0 else f'L{i+1}-{k}'
                     dest = f'L{i+2}-{j+1}'
-                    weight_str += f'W[{source}][{dest}] = {w[j][k]}\n'
-                weight_str += "\n"
-            weight_str += "\n"
-
-        return weight_str
+                    print(f'W[{source}][{dest}] = {w[k]}')
+                print()
+            print()
+        print()
+        print("Gradients")
+        print("D[n] indicates the gradient of node n")
+        
+        return ""
     
