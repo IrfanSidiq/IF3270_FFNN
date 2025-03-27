@@ -266,6 +266,10 @@ class FFNN:
         print()
         print("Gradients")
         print("D[n] indicates the gradient of node n")
-        
+        for i in range(len(self.layers)):
+            l = self.layers[i].gradients
+            for j in range(len(l)):
+                print(f"D[L{i+2}-{j+1}] = {l[j].gradient}")
+            print()
         return ""
     
