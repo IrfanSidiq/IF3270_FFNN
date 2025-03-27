@@ -87,3 +87,12 @@ class GELU(ActivationFunction):
         d_phi = np.exp(-np.power(x,2) / 2) / np.sqrt(2 * np.pi)
         phi = 0.5 * (1 + erf(x + np.sqrt(2)))
         return x * d_phi + phi
+    
+class SILU(ActivationFunction):
+    @staticmethod
+    def forward(x: np.ndarray) -> np.ndarray:
+        return x * Sigmoid.forward(x)
+    
+    @staticmethod
+    def backward(x: np.ndarray) -> np.ndarray:
+        return Sigmoid.forward(x) + x * Sigmoid.backward(x) * (1 - Sigmoid.forward(x))
