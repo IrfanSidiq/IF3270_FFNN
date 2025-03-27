@@ -1,6 +1,8 @@
 from typing import List
 from abc import ABC, abstractmethod
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 from src.tensor import Tensor
 from src.activation_function import ActivationFunction, Linear, ReLU, Sigmoid, HyperbolicTangent, Softmax, GELU
@@ -41,8 +43,29 @@ class Layer(ABC):
         """
         Calculates the output of the layer given an input vector.
         """
-        pass    
+        pass
 
+    def plot_dist(self, is_weight: bool, n_layer: int):
+        """
+        Plot distribution of weights or gradients in this layer
+        """
+        data = []
+        if is_weight:
+            for i in range (len(self.weights)):
+                data.extend(self.weights[i].data.flatten())
+        else:
+            for i in range (len(self.gradients)):
+                data.extend(self.gradients[i].gradient.flatten())
+        data = np.array(data)
+
+        plt.figure()
+        text = 'Weights' if is_weight else 'Gradients'
+        sns.histplot(data, kde=True, color='dodgerblue', edgecolor='black', kde_kws={'color': 'maroon'})
+        plt.xlabel(text)
+        plt.ylabel('Frequency')
+        plt.title(f'{text} Distribution Plot Of Layer {n_layer}')
+        plt.tight_layout()
+        plt.show()
 
 class Dense(Layer):
     def __init__(self, neuron_size: int, activation: str = "relu", kernel_initializer: str = "he_normal", input_size: int=None) -> None:

@@ -273,3 +273,42 @@ class FFNN:
             print()
         return ""
     
+    def plot_weights(self, layer: List[int]):
+        """
+        Plot weights distribution from multiple layers
+        """
+        if min(layer) < 2:
+            raise ValueError(
+                "Any layer number must not be less than 2\n"
+                "Selecting layer n will plot the weights between layer n and layer n-1\n"
+                "Example for plotting weight between input layer (layer 1) and the first hidden layer (layer 2):\n"
+                "plot_weights([2])\n"
+            )
+        if max(layer) > len(self.layers) + 1:
+            raise ValueError(
+                f"The amount of layers in the model is {len(self.layers)+1}\n"
+                "Any layer number must not exceed the amount of layers\n"
+            )
+        
+        for i in layer:
+            self.layers[i-2].plot_dist(True, i)
+
+    def plot_gradients(self, layer: List[int]):
+        """
+        Plot gradients distribution from multiple layers
+        """
+        if min(layer) < 2:
+            raise ValueError(
+                "Any layer number must not be less than 2\n"
+                "Selecting layer n will plot the gradients of layer n\n"
+                "Example for plotting gradients from the first hidden layer (layer 2):\n"
+                "plot_gradients([2])\n"
+            )
+        if max(layer) > len(self.layers) + 1:
+            raise ValueError(
+                f"The amount of layers in the model is {len(self.layers)+1}\n"
+                "Any layer number must not exceed the amount of layers\n"
+            )
+        
+        for i in layer:
+            self.layers[i-2].plot_dist(False, i)
