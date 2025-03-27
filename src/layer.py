@@ -14,6 +14,7 @@ class Layer(ABC):
     activation_function: ActivationFunction
     weight_initializer: WeightInitializer
     weights: List[Tensor]
+    gradients: List[Tensor]
     output: Tensor
 
     @abstractmethod
@@ -85,6 +86,7 @@ class Dense(Layer):
                 )
 
         self.output = np.zeros(neuron_size)
+        self.gradients = [Tensor(np.array([0])) for _ in range(neuron_size)]
 
         if input_size:
             self.initialize_weights(input_size)
@@ -106,6 +108,8 @@ class Dense(Layer):
             w_x = weight * input
             net = w_x.sum()
             nets.append(net)
+
+        self.gradients = nets
 
         res = None
         if self.activation_function is Softmax:
