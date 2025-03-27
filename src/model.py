@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -15,6 +15,7 @@ class FFNN:
     loss_function: LossFunction
     layers: List[Layer]
     output: Tensor
+    _train_history: List[Tuple[float, float]]
 
     def __init__(self, layers: List[Layer]) -> None:
         if not layers:
@@ -35,6 +36,7 @@ class FFNN:
         
         self.loss_function = None
         self.output = None
+        self._train_history = []
 
     def get_parameters(self) -> List[Tensor]:
         """
@@ -107,7 +109,7 @@ class FFNN:
         loss = self.output.compute_loss(y_true, self.loss_function)
         loss.backward()
     
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray, epochs: int = 10, batch_size: int = 32, validation_data: tuple = ()):
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray, epochs: int = 10, batch_size: int = 32, verbose: bool = 0, validation_data: tuple = ()):
         """
         Trains the model with given training data.
         Input must be a 2D NumPy array, containing one or multiple data records for training.
@@ -135,10 +137,24 @@ class FFNN:
                 
                 self.optimizer.step()
             
+            val_loss = 0
+            train_loss = self.output.compute_loss(y_train, self.loss_function) # y
+
             if validation_data:
                 self.output = Tensor(np.array(self.predict(validation_data[0]))) # X
-                loss = self.output.compute_loss(validation_data[1], self.loss_function) # y
-                print(f"Epoch {_+1}, Validation Loss: {loss.data[0]}")
+                val_loss = self.output.compute_loss(validation_data[1], self.loss_function) # y
+
+            self._train_history.append((train_loss, val_loss))
+
+            if verbose:
+                progress = (i + 1) / epochs
+                bar_length = 20  # Panjang progress bar
+                block = int(bar_length * progress)
+                print(f"\rEpoch {i+1}/{epochs}" + " " * (bar_length + 10))
+                print(f"Training Loss: {train_loss:.4f}")
+                print(f"Validation Loss: {val_loss:.4f}")
+                print(f"-" * 20)
+                print(f"[{'#' * block}{'-' * (bar_length - block)}] {progress * 100:.2f}%", end="")
         
     def predict(self, X_test: np.ndarray):
         """
