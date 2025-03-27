@@ -47,6 +47,18 @@ class FFNN:
             parameters.extend(layer.get_parameters())
 
         return parameters
+    
+    def print_history(self):
+        """
+        Prints training history of the model.
+        """
+        if not self._train_history:
+            raise RuntimeError("No training history available! Train the model using fit().")
+
+        train_loss, val_loss = zip(*self._train_history)
+        
+        for i in range(len(train_loss)):
+            print(f"Epoch {i+1} \nTraining Loss: {train_loss[i]:.4f} \nValidation Loss: {val_loss[i]:.4f}")
 
     def compile(self, optimizer: str = "sgd", loss: str = "mean_squared_error") -> None:
         """
