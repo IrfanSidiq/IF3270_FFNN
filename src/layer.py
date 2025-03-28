@@ -5,7 +5,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from src.tensor import Tensor
-from src.activation_function import ActivationFunction, Linear, ReLU, Sigmoid, HyperbolicTangent, Softmax, GELU
+from src.activation_function import ActivationFunction, Linear, ReLU, Sigmoid, HyperbolicTangent, Softmax, GELU, SILU
 from src.weight_initializer import (
     WeightInitializer, ZeroInitializer, RandomUniformInitializer, 
     RandomNormalInitializer, GlorotUniformInitializer, HeNormalInitializer
@@ -45,7 +45,7 @@ class Layer(ABC):
         """
         pass
 
-    def plot_dist(self, is_weight: bool, n_layer: int):
+    def plot_dist(self, is_weight: bool, n_layer: int, output_layer: int):
         """
         Plot distribution of weights or gradients in this layer.
         """
@@ -58,13 +58,18 @@ class Layer(ABC):
                 data.extend(self.gradients[i].gradient.flatten())
         
         data = np.array(data)
-        text = 'Weights' if is_weight else 'Gradients'
+        text = 'Weight' if is_weight else 'Gradient'
+        title = f'{text} Distribution Plot of '
+        if n_layer == output_layer:
+            title += 'Output Layer'
+        else:
+            title += f'Hidden Layer {n_layer}'
 
         plt.figure()
         sns.histplot(data, kde=True, color='dodgerblue', edgecolor='black')
         plt.xlabel(text)
         plt.ylabel('Frequency')
-        plt.title(f'{text} Distribution Plot Of Layer {n_layer}')
+        plt.title(title)
         plt.tight_layout()
         plt.show()
 
@@ -83,10 +88,12 @@ class Dense(Layer):
                 self.activation_function = Softmax
             case "gelu":
                 self.activation_function = GELU
+            case "silu":
+                self.activation_function = SILU
             case _:
                 raise ValueError(
                     f"Activation function '{activation}' is not supported. "
-                    "Supported parameters: 'linear', 'relu'"
+                    "Supported parameters: 'linear', 'relu', 'sigmoid', 'tanh', 'softmax', 'gelu', 'silu'"
                 )
 
         match kernel_initializer.lower():

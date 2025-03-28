@@ -15,7 +15,7 @@ class FFNN:
     loss_function: LossFunction
     layers: List[Layer]
     output: Tensor
-    _train_history: List[Tuple[float, float]]
+    __train_history: List[Tuple[float, float]]
 
     def __init__(self, layers: List[Layer]) -> None:
         if not layers:
@@ -36,7 +36,7 @@ class FFNN:
         
         self.loss_function = None
         self.output = None
-        self._train_history = []
+        self.__train_history = None
 
     def get_parameters(self) -> List[Tensor]:
         """
@@ -52,13 +52,16 @@ class FFNN:
         """
         Prints training history of the model.
         """
-        if not self._train_history:
+        if not self.__train_history:
             raise RuntimeError("No training history available! Train the model using fit().")
 
-        train_loss, val_loss = zip(*self._train_history)
+        train_loss, val_loss = zip(*self.__train_history)
         
         for i in range(len(train_loss)):
-            print(f"Epoch {i+1} \nTraining Loss: {train_loss[i]:.4f} \nValidation Loss: {val_loss[i]:.4f}")
+            print(f"Epoch {i+1} \nTraining Loss: {train_loss[i]:.4f}")
+            if val_loss[i] is not None:
+                print(f"Validation Loss: {val_loss[i]:.4f}")
+            print("------------------------")
 
     def compile(self, optimizer: str = "sgd", loss: str = "mean_squared_error") -> None:
         """
@@ -72,7 +75,7 @@ class FFNN:
             case _:
                 raise ValueError(
                     f"Optimizer '{optimizer}' is not supported. "
-                    "Supported parameters: 'sgd', blablablabla"
+                    "Supported parameters: 'sgd'"
                 )
         
         self.optimizer.set_parameters(self.get_parameters())
@@ -140,6 +143,8 @@ class FFNN:
             
             batches.append(batch)
 
+        self.__train_history = []
+
         for i in range(epochs):
             train_loss = []
             for batch in batches:
@@ -159,7 +164,7 @@ class FFNN:
                 self.output = Tensor(np.array(self.predict(validation_data[0]))) # X
                 val_loss = self.output.compute_loss(validation_data[1], self.loss_function) # y
 
-            self._train_history.append((train_loss, val_loss))
+            self.__train_history.append((train_loss, val_loss.data[0]))
 
             if verbose:
                 progress = (i + 1) / epochs
@@ -220,7 +225,7 @@ class FFNN:
         n_layers.append(len(self.layers[0].weights[0].data))
 
         for i in range(len(self.layers)):
-            n_layers.append(self.layers[i].get_neuron_size() + (1 if i == len(self.layers) - 1 else 0))
+            n_layers.append(self.layers[i].get_neuron_size() + 1)
 
         return n_layers
 
@@ -246,7 +251,7 @@ class FFNN:
             font_size /= (max_nodes ** 0.2)
 
             for i, layer in enumerate(list_of_layer):
-                for j in range(layer):
+                for j in range(layer - (1 if i == len(list_of_layer) - 1 else 0)):
                     node = plt.Circle(
                         (i * layer_spacing, -(j - layer / 2)),
                         radius=radius,
@@ -300,7 +305,7 @@ class FFNN:
             plt.tight_layout()
             plt.show()
         else:
-            _, ax = plt.subplot(figsize=(10,10))
+            _, ax = plt.subplots(figsize=(10,10))
             ax.axis('off')
             ax.set_aspect('equal')
 
@@ -312,6 +317,7 @@ class FFNN:
                     fill=True,
                     zorder = 2
                 )
+                ax.add_patch(node)
 
                 label = None
                 if i == 0:
@@ -371,23 +377,23 @@ class FFNN:
         """
         if min(layer) < 1:
             raise ValueError(
-                "Any layer number must not be less than 1\n"
-                "Selecting layer n will plot the weights between layer n and layer n-1\n"
+                "Any layer number must not be less than 1.\n"
+                "Selecting layer n will plot the weights between layer n and layer n-1.\n"
                 "Example for plotting weight between input layer (layer 0) and the first hidden layer (layer 1):\n"
                 "plot_weights([1])\n"
             )
         if max(layer) > len(self.layers):
             raise ValueError(
-                f"The amount of layers in the model is {len(self.layers)}\n"
-                "Any layer number must not exceed the amount of layers\n"
+                f"The amount of layers in the model is {len(self.layers)}.\n"
+                "Any layer number must not exceed the amount of layers.\n"
             )
         
         for i in layer:
-            self.layers[i-1].plot_dist(True, i)
+            self.layers[i-1].plot_dist(True, i, len(self.layers))
 
     def plot_gradients(self, layer: List[int]):
         """
-        Plot gradients distribution from multiple layers
+        Plot gradients distribution from multiple layers.
         """
         if min(layer) < 1:
             raise ValueError(
@@ -396,11 +402,11 @@ class FFNN:
                 "Example for plotting gradients from the first hidden layer (layer 1):\n"
                 "plot_gradients([1])\n"
             )
-        if max(layer) > len(self.layers) + 1:
+        if max(layer) > len(self.layers):
             raise ValueError(
-                f"The amount of layers in the model is {len(self.layers)+1}\n"
+                f"The amount of layers in the model is {len(self.layers)}\n"
                 "Any layer number must not exceed the amount of layers\n"
             )
         
         for i in layer:
-            self.layers[i-1].plot_dist(False, i)
+            self.layers[i-1].plot_dist(False, i, len(self.layers))
