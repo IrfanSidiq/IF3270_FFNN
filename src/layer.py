@@ -47,7 +47,7 @@ class Layer(ABC):
 
     def plot_dist(self, is_weight: bool, n_layer: int):
         """
-        Plot distribution of weights or gradients in this layer
+        Plot distribution of weights or gradients in this layer.
         """
         data = []
         if is_weight:
@@ -56,11 +56,13 @@ class Layer(ABC):
         else:
             for i in range (len(self.gradients)):
                 data.extend(self.gradients[i].gradient.flatten())
+        
         data = np.array(data)
+        text = 'Weights' if is_weight else 'Gradients'
 
         plt.figure()
-        text = 'Weights' if is_weight else 'Gradients'
-        sns.histplot(data, kde=True, color='dodgerblue', edgecolor='black', kde_kws={'color': 'maroon'})
+        sns.histplot(data, kde=True, color='dodgerblue', edgecolor='black')
+        sns.kdeplot(data, color='maroon')
         plt.xlabel(text)
         plt.ylabel('Frequency')
         plt.title(f'{text} Distribution Plot Of Layer {n_layer}')

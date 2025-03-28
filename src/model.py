@@ -121,7 +121,7 @@ class FFNN:
         loss = self.output.compute_loss(y_true, self.loss_function)
         loss.backward()
     
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray, epochs: int = 10, batch_size: int = 32, verbose: bool = 0, validation_data: tuple = ()):
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray, epochs: int = 10, batch_size: int = 32, verbose: bool = 0, validation_data: tuple = None):
         """
         Trains the model with given training data.
         Input must be a 2D NumPy array, containing one or multiple data records for training.
@@ -140,19 +140,22 @@ class FFNN:
             
             batches.append(batch)
 
-        for _ in range(epochs):
+        for i in range(epochs):
+            train_loss = []
             for batch in batches:
                 self.optimizer.zero_grad()
                 for sample in batch:
                     self.forward(Tensor(sample[0])) # X
+                    loss = self.output.compute_loss(sample[1], self.loss_function) # y
+                    train_loss.append(loss.data[0])
                     self.backward(sample[1]) # y
                 
                 self.optimizer.step()
             
-            val_loss = 0
-            train_loss = self.output.compute_loss(y_train, self.loss_function) # y
+            train_loss = np.mean(np.array(train_loss))
+            val_loss = None
 
-            if validation_data:
+            if validation_data is not None:
                 self.output = Tensor(np.array(self.predict(validation_data[0]))) # X
                 val_loss = self.output.compute_loss(validation_data[1], self.loss_function) # y
 
@@ -160,13 +163,17 @@ class FFNN:
 
             if verbose:
                 progress = (i + 1) / epochs
-                bar_length = 20  # Panjang progress bar
-                block = int(bar_length * progress)
-                print(f"\rEpoch {i+1}/{epochs}" + " " * (bar_length + 10))
+                progress_bar_length = 20
+                block = int(progress_bar_length * progress)
+
+                print(f"\rEpoch {i+1}/{epochs}" + " " * (progress_bar_length + 10))
                 print(f"Training Loss: {train_loss:.4f}")
-                print(f"Validation Loss: {val_loss:.4f}")
+                
+                if val_loss is not None:
+                    print(f"Validation Loss: {val_loss.data[0]:.4f}")
+                
                 print(f"-" * 20)
-                print(f"[{'#' * block}{'-' * (bar_length - block)}] {progress * 100:.2f}%", end="")
+                print(f"[{'#' * block}{'-' * (progress_bar_length - block)}] {progress * 100:.2f}%", end="")
         
     def predict(self, X_test: np.ndarray):
         """
@@ -213,7 +220,7 @@ class FFNN:
         n_layers.append(len(self.layers[0].weights[0].data))
 
         for i in range(len(self.layers)):
-            n_layers.append(len(self.layers[i].get_neuron_size()) + 1)
+            n_layers.append(self.layers[i].get_neuron_size() + 1)
 
         return n_layers
 
@@ -229,12 +236,17 @@ class FFNN:
         ax.axis('off')
         ax.set_aspect('equal')
 
-        radius = 0.5 / (self.max_nodes ** 0.3)
-        font_size = 16 / (self.max_nodes ** 0.2)
-        layer_spacing = 2.5 / (self.num_layers ** 0.5)
+        max_nodes = -float("inf")
+        for layer in self.layers:
+            if layer.get_neuron_size() > max_nodes:
+                max_nodes = layer.get_neuron_size()
+
+        radius = 0.5 / (max_nodes ** 0.2)
+        font_size = 16 / (max_nodes ** 0.2)
+        layer_spacing = 2.5 / (len(self.layers) ** 0.5)
 
         for i, layer in enumerate(list_of_layer):
-            for j in range(layer):
+            for j in range(layer - (1 if i == len(list_of_layer) - 1 else 0)):
                 node = plt.Circle(
                     (i * layer_spacing, -(j - layer / 2)),
                     radius=radius,
@@ -244,7 +256,16 @@ class FFNN:
                 )
                 ax.add_patch(node)
 
-                label = f'B{i+1}' if (j == layer-1 and i != width - 1) else f'L{i+1}-{j+1}' 
+                label = None
+                if j == layer - 1 and i != width - 1:
+                    label = f'b{i}'
+                elif i == 0:
+                    label = f'x{j+1}'
+                elif i == width - 1:
+                    label = f'o{j+1}'
+                else:
+                    label = f'h{i}-{j+1}'
+                
                 ax.text(
                     i * layer_spacing,
                     -(j - layer / 2),
@@ -252,7 +273,7 @@ class FFNN:
                     ha='center',
                     va='center',
                     color='white',
-                    font_size=font_size,
+                    fontsize=font_size,
                     zorder = 3
                 )
 
@@ -279,25 +300,24 @@ class FFNN:
         plt.tight_layout()
         plt.show()
 
-        print("Weights")
-        print("W[n][m] indicates weight value from node n to node m")
+        print("Weights (W[n][m] indicates weight value from node n to node m):\n")
         for i in range(len(self.layers)):
             l = self.layers[i]
             for j in range(len(l.weights)):
                 w = l.weights[j].data
                 for k in range(len(w)):
-                    source = f'B{i+1}' if k == 0 else f'L{i+1}-{k}'
-                    dest = f'L{i+2}-{j+1}'
+                    source = f'b{i}' if k == 0 else f'h{i}-{k}' if i > 0 else f'x{k}'
+                    dest = f'o{j+1}' if (i == len(self.layers) - 1) else f'h{i+1}-{j+1}'
                     print(f'W[{source}][{dest}] = {w[k]}')
                 print()
             print()
-        print()
-        print("Gradients")
-        print("D[n] indicates the gradient of node n")
+
+        print("\nGradients (D[n] indicates the gradient of node n):\n")
         for i in range(len(self.layers)):
             l = self.layers[i].gradients
             for j in range(len(l)):
-                print(f"D[L{i+2}-{j+1}] = {l[j].gradient}")
+                label = f'o{j+1}' if (i == len(self.layers) - 1) else f'h{i+1}-{j+1}'
+                print(f"D[{label}] = {l[j].gradient}")
             print()
         return ""
     
@@ -305,21 +325,21 @@ class FFNN:
         """
         Plot weights distribution from multiple layers
         """
-        if min(layer) < 2:
+        if min(layer) < 1:
             raise ValueError(
-                "Any layer number must not be less than 2\n"
+                "Any layer number must not be less than 1\n"
                 "Selecting layer n will plot the weights between layer n and layer n-1\n"
-                "Example for plotting weight between input layer (layer 1) and the first hidden layer (layer 2):\n"
-                "plot_weights([2])\n"
+                "Example for plotting weight between input layer (layer 0) and the first hidden layer (layer 1):\n"
+                "plot_weights([1])\n"
             )
-        if max(layer) > len(self.layers) + 1:
+        if max(layer) > len(self.layers):
             raise ValueError(
-                f"The amount of layers in the model is {len(self.layers)+1}\n"
+                f"The amount of layers in the model is {len(self.layers)}\n"
                 "Any layer number must not exceed the amount of layers\n"
             )
         
         for i in layer:
-            self.layers[i-2].plot_dist(True, i)
+            self.layers[i-1].plot_dist(True, i)
 
     def plot_gradients(self, layer: List[int]):
         """
