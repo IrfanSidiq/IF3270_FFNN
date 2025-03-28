@@ -319,7 +319,7 @@ class FFNN:
                 elif i == width - 1:
                     label = f'o({layer})'
                 else:
-                    label = f'h({layer-1})'
+                    label = f'h{i}({layer-1})'
 
                 ax.text(
                     i * layer_spacing,
