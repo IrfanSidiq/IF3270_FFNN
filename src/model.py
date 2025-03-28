@@ -220,7 +220,7 @@ class FFNN:
         n_layers.append(len(self.layers[0].weights[0].data))
 
         for i in range(len(self.layers)):
-            n_layers.append(self.layers[i].get_neuron_size() + 1)
+            n_layers.append(self.layers[i].get_neuron_size() + (1 if i == len(self.layers) - 1 else 0))
 
         return n_layers
 
@@ -231,44 +231,99 @@ class FFNN:
         list_of_layer = self.__get_node_of_layers()
         width = len(list_of_layer)
         height = max(list_of_layer) * 1.5
+        max_nodes = max(list_of_layer)
 
-        _, ax = plt.subplots(figsize=(width,height))
-        ax.axis('off')
-        ax.set_aspect('equal')
+        radius = 0.5
+        font_size = 16
+        layer_spacing = 2.5 / (width ** 0.5)
 
-        max_nodes = -float("inf")
-        for layer in self.layers:
-            if layer.get_neuron_size() > max_nodes:
-                max_nodes = layer.get_neuron_size()
+        if (max_nodes <= 10 and width <= 15):
+            _, ax = plt.subplots(figsize=(width,height))
+            ax.axis('off')
+            ax.set_aspect('equal')
 
-        radius = 0.5 / (max_nodes ** 0.2)
-        font_size = 16 / (max_nodes ** 0.2)
-        layer_spacing = 2.5 / (len(self.layers) ** 0.5)
+            radius /= (max_nodes ** 0.2)
+            font_size /= (max_nodes ** 0.2)
 
-        for i, layer in enumerate(list_of_layer):
-            for j in range(layer - (1 if i == len(list_of_layer) - 1 else 0)):
+            for i, layer in enumerate(list_of_layer):
+                for j in range(layer):
+                    node = plt.Circle(
+                        (i * layer_spacing, -(j - layer / 2)),
+                        radius=radius,
+                        color = plt.cm.tab10(i%10),
+                        fill=True,
+                        zorder = 2
+                    )
+                    ax.add_patch(node)
+
+                    label = None
+                    if j == layer - 1 and i != width - 1:
+                        label = f'b{i}'
+                    elif i == 0:
+                        label = f'x{j+1}'
+                    elif i == width - 1:
+                        label = f'o{j+1}'
+                    else:
+                        label = f'h{i}-{j+1}'
+                    
+                    ax.text(
+                        i * layer_spacing,
+                        -(j - layer / 2),
+                        label,
+                        ha='center',
+                        va='center',
+                        color='white',
+                        fontsize=font_size,
+                        zorder = 3
+                    )
+
+            for i in range(width - 1):
+                for j in range(list_of_layer[i]):
+                    for k in range(list_of_layer[i+1] - 1):
+                        if (i + 1 != width - 1) and (k == list_of_layer[i+1] - 1):
+                            continue
+
+                        x_start = i * layer_spacing
+                        y_start = -(j - list_of_layer[i] / 2)
+                        x_finish = (i+1) * layer_spacing
+                        y_finish = -(k - list_of_layer[i+1] / 2)
+
+                        ax.plot(
+                            [x_start,x_finish],
+                            [y_start,y_finish],
+                            color='black',
+                            zorder=1
+                        )
+
+            plt.xlim(-1, (width - 1) * layer_spacing + 1)
+            plt.ylim(-max(list_of_layer)/2 - 0.5, max(list_of_layer) / 2 + 0.5)
+            plt.tight_layout()
+            plt.show()
+        else:
+            _, ax = plt.subplot(figsize=(10,10))
+            ax.axis('off')
+            ax.set_aspect('equal')
+
+            for i, layer in enumerate(list_of_layer):
                 node = plt.Circle(
-                    (i * layer_spacing, -(j - layer / 2)),
+                    (i * layer_spacing, 0),
                     radius=radius,
                     color = plt.cm.tab10(i%10),
                     fill=True,
                     zorder = 2
                 )
-                ax.add_patch(node)
 
                 label = None
-                if j == layer - 1 and i != width - 1:
-                    label = f'b{i}'
-                elif i == 0:
-                    label = f'x{j+1}'
+                if i == 0:
+                    label = f'x({layer-1})'
                 elif i == width - 1:
-                    label = f'o{j+1}'
+                    label = f'o({layer})'
                 else:
-                    label = f'h{i}-{j+1}'
-                
+                    label = f'h({layer-1})'
+
                 ax.text(
                     i * layer_spacing,
-                    -(j - layer / 2),
+                    0,
                     label,
                     ha='center',
                     va='center',
@@ -277,28 +332,17 @@ class FFNN:
                     zorder = 3
                 )
 
-        for i in range(width - 1):
-            for j in range(list_of_layer[i]):
-                for k in range(list_of_layer[i+1] - 1):
-                    if (i + 1 != width - 1) and (k == list_of_layer[i+1] - 1):
-                        continue
-
-                    x_start = i * layer_spacing
-                    y_start = -(j - list_of_layer[i] / 2)
-                    x_finish = (i+1) * layer_spacing
-                    y_finish = -(k - list_of_layer[i+1] / 2)
-
+                if i < width - 1:
                     ax.plot(
-                        [x_start,x_finish],
-                        [y_start,y_finish],
+                        [i * layer_spacing, (i+1) * layer_spacing],
+                        [0, 0],
                         color='black',
                         zorder=1
                     )
-
-        plt.xlim(-1, (width - 1) * layer_spacing + 1)
-        plt.ylim(-max(list_of_layer)/2 - 0.5, max(list_of_layer) / 2 + 0.5)
-        plt.tight_layout()
-        plt.show()
+            plt.xlim(-1, (width - 1) * layer_spacing + 1)
+            plt.ylim(-0.5, 0.5)
+            plt.tight_layout()
+            plt.show()
 
         print("Weights (W[n][m] indicates weight value from node n to node m):\n")
         for i in range(len(self.layers)):
@@ -345,12 +389,12 @@ class FFNN:
         """
         Plot gradients distribution from multiple layers
         """
-        if min(layer) < 2:
+        if min(layer) < 1:
             raise ValueError(
-                "Any layer number must not be less than 2\n"
+                "Any layer number must not be less than 1\n"
                 "Selecting layer n will plot the gradients of layer n\n"
-                "Example for plotting gradients from the first hidden layer (layer 2):\n"
-                "plot_gradients([2])\n"
+                "Example for plotting gradients from the first hidden layer (layer 1):\n"
+                "plot_gradients([1])\n"
             )
         if max(layer) > len(self.layers) + 1:
             raise ValueError(
@@ -359,4 +403,4 @@ class FFNN:
             )
         
         for i in layer:
-            self.layers[i-2].plot_dist(False, i)
+            self.layers[i-1].plot_dist(False, i)

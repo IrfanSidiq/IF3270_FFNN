@@ -62,7 +62,6 @@ class Layer(ABC):
 
         plt.figure()
         sns.histplot(data, kde=True, color='dodgerblue', edgecolor='black')
-        sns.kdeplot(data, color='maroon')
         plt.xlabel(text)
         plt.ylabel('Frequency')
         plt.title(f'{text} Distribution Plot Of Layer {n_layer}')
