@@ -65,8 +65,9 @@ class Layer(ABC):
         else:
             title += f'Hidden Layer {n_layer}'
 
-        plt.figure()
-        sns.histplot(data, kde=True, color='dodgerblue', edgecolor='black')
+        _, ax = plt.subplots()
+        ax = sns.histplot(data, kde=True, color='dodgerblue', edgecolor='black')
+        ax.lines[0].set_color('maroon')
         plt.xlabel(text)
         plt.ylabel('Frequency')
         plt.title(title)
