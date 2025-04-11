@@ -9,6 +9,8 @@ Panduan mengenai contoh cara menjalankan program dapat dilihat di:
 - `percobaan_laporan.ipynb` untuk percobaan yang dilakukan di laporan
 
 ## Pembagian Tugas
-| 13522007         | Tensor, Optimizer, WeightInitializer, Layer, FFNN, regularisasi, RMSNorm |
-| 13522033         | ActivationFunction (sigmoid, tanh, softmax, GELU), visualisasi model, distribusi bobot dan gradien |
-| 13522041         | ActivationFunction (SILU), LossFunction (binary & categorical crossentropy), fitur history & verbose |
+| NIM       | Tugas                                                                                      |
+|-----------|---------------------------------------------------------------------------------------------|
+| 13522007  | Tensor, Optimizer, WeightInitializer, Layer, FFNN, Regularisasi, RMSNorm                   |
+| 13522033  | ActivationFunction (Sigmoid, Tanh, Softmax, GELU), Visualisasi Model, Distribusi Bobot dan Gradien |
+| 13522041  | ActivationFunction (SILU), LossFunction (Binary & Categorical Crossentropy), Fitur History & Verbose |
