@@ -16,7 +16,7 @@ class Layer(ABC):
     activation_function: ActivationFunction
     weight_initializer: WeightInitializer
     weights: List[Tensor]
-    gradients: List[Tensor]
+    gradients: List[Tensor] 
     output: Tensor
 
     @abstractmethod
@@ -67,7 +67,8 @@ class Layer(ABC):
 
         _, ax = plt.subplots()
         ax = sns.histplot(data, kde=True, color='dodgerblue', edgecolor='black')
-        ax.lines[0].set_color('maroon')
+        if ax.lines:
+            ax.lines[0].set_color('maroon')
         plt.xlabel(text)
         plt.ylabel('Frequency')
         plt.title(title)

@@ -15,7 +15,7 @@ class ZeroInitializer(WeightInitializer):
     def __init__(self):
         pass
 
-    def initialize_weight(neuron_size: int, input_size: int):
+    def initialize_weight(self, neuron_size: int, input_size: int):
         return np.zeros((neuron_size, input_size))
 
 

@@ -2,17 +2,20 @@ from typing import List, Tuple
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+import os
+import json
 
 from src.tensor import Tensor
 from src.layer import Layer, Dense
+from src.weight_initializer import ZeroInitializer, RandomUniformInitializer, RandomNormalInitializer, GlorotUniformInitializer, HeNormalInitializer
 from src.loss_function import LossFunction, MeanSquaredError, BinaryCrossEntropy, CategoricalCrossEntropy
-from src.activation_function import Softmax
+from src.activation_function import Linear, ReLU, Sigmoid, HyperbolicTangent, Softmax, GELU, SILU
 from src.optimizer import Optimizer, StochasticGradientDescent
-
+from src.regularized_loss import RegularizedLoss
 
 class FFNN:
     optimizer: Optimizer
-    loss_function: LossFunction
+    loss_function: LossFunction | RegularizedLoss
     layers: List[Layer]
     output: Tensor
     __train_history: List[Tuple[float, float]]
@@ -48,7 +51,7 @@ class FFNN:
 
         return parameters
     
-    def print_history(self):
+    def print_history(self) -> None:
         """
         Prints training history of the model.
         """
@@ -108,7 +111,7 @@ class FFNN:
     
     def backward(self, y_true: np.ndarray) -> None:
         """
-        Computes gradient through backpropagation.
+        Computes gradient through backpropagation using automated differentiation.
         """
         if not self.output:
             raise RuntimeError("Forwardpropagation has not been done yet! Initiate forwardpropagation using forward().")
@@ -123,8 +126,11 @@ class FFNN:
 
         loss = self.output.compute_loss(y_true, self.loss_function)
         loss.backward()
+
+        if isinstance(self.loss_function, RegularizedLoss):
+            self.loss_function.backward(y_true, self.output.data)
     
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray, epochs: int = 10, batch_size: int = 32, verbose: bool = 0, validation_data: tuple = None):
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray, epochs: int = 10, batch_size: int = 32, verbose: bool = 0, validation_data: tuple = None) -> None:
         """
         Trains the model with given training data.
         Input must be a 2D NumPy array, containing one or multiple data records for training.
@@ -180,7 +186,7 @@ class FFNN:
                 print(f"-" * 20)
                 print(f"[{'#' * block}{'-' * (progress_bar_length - block)}] {progress * 100:.2f}%", end="")
         
-    def predict(self, X_test: np.ndarray):
+    def predict(self, X_test: np.ndarray) -> List[np.ndarray]:
         """
         Predicts the class of given test data.
         Input must be a 2D NumPy array, containing multiple data records to be predicted.
@@ -191,7 +197,7 @@ class FFNN:
         
         return y_pred
     
-    def evaluate(self, X_test: np.ndarray, y_test: np.ndarray):
+    def evaluate(self, X_test: np.ndarray, y_test: np.ndarray) -> tuple[float, float]:
         """
         Evaluates the model performance on the test set.
         Automatically detects if it's classification or regression based on loss function.
@@ -219,7 +225,7 @@ class FFNN:
     
     def __get_node_of_layers(self) -> List[int]:
         """
-        Return a list of the number of nodes in each layer, including the bias node
+        Returns a list of the number of nodes in each layer, including the bias node.
         """
         n_layers = []
         n_layers.append(len(self.layers[0].weights[0].data))
@@ -229,9 +235,9 @@ class FFNN:
 
         return n_layers
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
-        Visualizing the neural network
+        Visualizes the neural network.
         """
         list_of_layer = self.__get_node_of_layers()
         width = len(list_of_layer)
@@ -304,6 +310,7 @@ class FFNN:
             plt.ylim(-max(list_of_layer)/2 - 0.5, max(list_of_layer) / 2 + 0.5)
             plt.tight_layout()
             plt.show()
+
         else:
             _, ax = plt.subplots(figsize=(10,10))
             ax.axis('off')
@@ -326,7 +333,7 @@ class FFNN:
                     label = 'o'
                 else:
                     label = f'h{i}'
-                label += f'({layer-1})'
+                label += f'({(layer - 2) if (i == width - 1) else (layer - 1)})'
 
                 ax.text(
                     i * layer_spacing,
@@ -372,9 +379,9 @@ class FFNN:
             print()
         return ""
     
-    def plot_weights(self, layer: List[int]):
+    def plot_weights(self, layer: List[int]) -> None:
         """
-        Plot weights distribution from multiple layers
+        Plot weights distribution from multiple layers.
         """
         if min(layer) < 1:
             raise ValueError(
@@ -392,7 +399,7 @@ class FFNN:
         for i in layer:
             self.layers[i-1].plot_dist(True, i, len(self.layers))
 
-    def plot_gradients(self, layer: List[int]):
+    def plot_gradients(self, layer: List[int]) -> None:
         """
         Plot gradients distribution from multiple layers.
         """
@@ -411,3 +418,183 @@ class FFNN:
         
         for i in layer:
             self.layers[i-1].plot_dist(False, i, len(self.layers))
+    
+    def save(self, file_path: str) -> None:
+        """
+        Saves the model into a JSON file.
+        """
+        if not isinstance(file_path, str):
+            raise TypeError("file_path must be a string")
+
+        if not file_path.strip():
+            raise ValueError("file_path cannot be empty or just spaces")
+
+        dir_name = os.path.dirname(file_path)
+        if dir_name and not os.path.exists(dir_name):
+            raise FileNotFoundError(f"Directory does not exist: {dir_name}")
+
+        print(f"Saving file to: {file_path}")
+
+        model_data = {
+            "layers": [],
+            "output": {
+                "data": self.output.data.tolist() if self.output else [0.0] * self.layers[-1].get_neuron_size(),
+                "gradient": self.output.gradient.tolist() if self.output else [0.0] * self.layers[-1].get_neuron_size()
+            },
+            "optimizer": {
+                "type": type(self.optimizer).__name__,
+                "learning_rate": self.optimizer.learning_rate
+            },
+            "loss_function": self.loss_function.__name__,
+            "train_history": self.__train_history if self.__train_history else []
+        }
+
+        for layer in self.layers:
+            layer_dict = {
+                "neuron_size": layer.get_neuron_size(),
+                "weights": [],
+                "gradients": [],
+                "weight_initializer": {
+                    "type": type(layer.weight_initializer).__name__,
+                    "config": {}
+                },
+                "activation_function": layer.activation_function.__name__
+            }
+
+            for weight in layer.weights:
+                layer_dict["weights"].append({
+                    "data": weight.data.tolist(),
+                    "gradient": weight.gradient.tolist()
+                })
+
+            for gradient in layer.gradients:
+                layer_dict["gradients"].append({
+                    "data": gradient.data.tolist(),
+                    "gradient": gradient.gradient.tolist()
+                })
+
+            initializer = layer.weight_initializer
+            if isinstance(initializer, RandomUniformInitializer):
+                layer_dict["weight_initializer"]["config"] = {
+                    "seed": initializer.seed,
+                    "lower_bound": initializer.lower_bound,
+                    "upper_bound": initializer.upper_bound
+                }
+            elif isinstance(initializer, RandomNormalInitializer):
+                layer_dict["weight_initializer"]["config"] = {
+                    "seed": initializer.seed,
+                    "mean": initializer.mean,
+                    "variance": initializer.variance
+                }
+            elif isinstance(initializer, (GlorotUniformInitializer, HeNormalInitializer)):
+                layer_dict["weight_initializer"]["config"] = {
+                    "seed": initializer.seed
+                }
+
+            model_data["layers"].append(layer_dict)
+
+        with open(file_path, "w") as f:
+            json.dump(model_data, f, indent=2)
+
+        print(f"Model successfully saved to {file_path}!")
+
+    def load(self, file_path: str) -> None:
+        """
+        Loads the JSON file created using save() to initialize model.
+        """
+        if not isinstance(file_path, str):
+            raise TypeError("file_path must be a string!")
+        if not file_path.strip():
+            raise ValueError("file_path cannot be empty or just spaces!")
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+        if not os.access(file_path, os.R_OK):
+            raise PermissionError(f"File is not readable: {file_path}")
+
+        print(f"Loading model from: {file_path}")
+
+        with open(file_path, "r") as f:
+            data = json.load(f)
+
+        activations = {
+            "Linear": Linear,
+            "ReLU": ReLU,
+            "Sigmoid": Sigmoid,
+            "HyperbolicTangent": HyperbolicTangent,
+            "Softmax": Softmax,
+            "GELU": GELU,
+            "SILU": SILU
+        }
+
+        loss_functions = {
+            "MeanSquaredError": MeanSquaredError,
+            "BinaryCrossEntropy": BinaryCrossEntropy,
+            "CategoricalCrossEntropy": CategoricalCrossEntropy
+        }
+
+        self.layers = []
+        for layer_data in data["layers"]:
+            neuron_size = layer_data["neuron_size"]
+            layer = Dense(neuron_size)
+
+            layer.weights = []
+            for w in layer_data["weights"]:
+                tensor = Tensor(np.array(w["data"]))
+                tensor.gradient = np.array(w["gradient"])
+                layer.weights.append(tensor)
+
+            layer.gradients = []
+            for g in layer_data["gradients"]:
+                tensor = Tensor(np.array(g["data"]))
+                tensor.gradient = np.array(g["gradient"])
+                layer.gradients.append(tensor)
+
+            init_type = layer_data["weight_initializer"]["type"]
+            init_config = layer_data["weight_initializer"]["config"]
+
+            if init_type == "ZeroInitializer":
+                layer.weight_initializer = ZeroInitializer()
+            elif init_type == "RandomUniformInitializer":
+                layer.weight_initializer = RandomUniformInitializer(
+                    lower_bound=init_config["lower_bound"],
+                    upper_bound=init_config["upper_bound"],
+                    seed=init_config["seed"]
+                )
+            elif init_type == "RandomNormalInitializer":
+                layer.weight_initializer = RandomNormalInitializer(
+                    mean=init_config["mean"],
+                    variance=init_config["variance"],
+                    seed=init_config["seed"]
+                )
+            elif init_type == "GlorotUniformInitializer":
+                layer.weight_initializer = GlorotUniformInitializer(
+                    seed=init_config["seed"]
+                )
+            elif init_type == "HeNormalInitializer":
+                layer.weight_initializer = HeNormalInitializer(
+                    seed=init_config["seed"]
+                )
+            else:
+                raise ValueError(f"Unsupported weight initializer: {init_type}")
+
+            activation_name = layer_data["activation_function"]
+            layer.activation_function = activations[activation_name]
+
+            self.layers.append(layer)
+
+        output_data = np.array(data["output"]["data"])
+        output_gradient = np.array(data["output"]["gradient"])
+        self.output = Tensor(output_data)
+        self.output.gradient = output_gradient
+
+        opt_data = data["optimizer"]
+        if opt_data["type"] == "StochasticGradientDescent":
+            self.optimizer = StochasticGradientDescent(opt_data["learning_rate"])
+        else:
+            raise ValueError(f"Unsupported optimizer type: {opt_data['type']}")
+
+        self.loss_function = loss_functions[data["loss_function"]]
+
+        self.__train_history = [tuple(entry) for entry in data.get("train_history", [])]
+
+        print(f"Model successfully loaded from {file_path}!")
