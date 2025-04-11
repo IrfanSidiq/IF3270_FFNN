@@ -12,12 +12,14 @@ from src.loss_function import LossFunction, MeanSquaredError, BinaryCrossEntropy
 from src.activation_function import Linear, ReLU, Sigmoid, HyperbolicTangent, Softmax, GELU, SILU
 from src.optimizer import Optimizer, StochasticGradientDescent
 from src.regularized_loss import RegularizedLoss
+from src.normalizer import RMSNorm
 
 class FFNN:
     optimizer: Optimizer
     loss_function: LossFunction | RegularizedLoss
     layers: List[Layer]
     output: Tensor
+    normalizer: RMSNorm
     __train_history: List[Tuple[float, float]]
 
     def __init__(self, layers: List[Layer]) -> None:
@@ -40,6 +42,7 @@ class FFNN:
         self.loss_function = None
         self.output = None
         self.__train_history = None
+        self.normalizer = None
 
     def get_parameters(self) -> List[Tensor]:
         """
@@ -66,7 +69,7 @@ class FFNN:
                 print(f"Validation Loss: {val_loss[i]:.4f}")
             print("------------------------")
 
-    def compile(self, optimizer: str = "sgd", loss: str = "mean_squared_error") -> None:
+    def compile(self, optimizer: str | Optimizer = "sgd", loss: str = "mean_squared_error", regularization: str | RegularizedLoss = None, normalize: bool = False) -> None:
         """
         Initializes optimizer and loss function of the network.
         """
@@ -95,15 +98,29 @@ class FFNN:
                     f"Loss function '{optimizer}' is not supported. "
                     "Supported parameters: 'mean_squared_error', 'binary_crossentropy', 'categorical_crossentropy'"
                 )
+            
+        if regularization is not None:
+            if isinstance(regularization, str):
+                self.loss_function = RegularizedLoss(loss_function=self.loss_function, regularization_type=regularization)
+            elif isinstance(regularization, RegularizedLoss):
+                self.loss_function = regularization
+            
+            self.loss_function.set_parameters(self.get_parameters())
+        
+        if normalize:
+            self.normalizer = RMSNorm
 
     def forward(self, input: Tensor) -> Tensor:
         """
         Initiates forwardpropagation through the network.
         """
         x = input
-        for layer in self.layers:
+        for i, layer in enumerate(self.layers):
             x = x.add_x0()
             x = layer.forward(x)
+
+            if self.normalizer is not None and i < len(self.layers) - 1: # not output layer
+                x = self.normalizer.forward(x)
         
         self.output = x
         self.output.tensor_type = "output"
@@ -205,15 +222,19 @@ class FFNN:
         y_pred = self.predict(X_test)
         loss = self.loss_function.forward(y_test, y_pred)
         
-        if self.loss_function is MeanSquaredError: 
+        loss_function = self.loss_function
+        if isinstance(loss_function, RegularizedLoss):
+            loss_function = loss_function.loss_function
+
+        if loss_function is MeanSquaredError: 
             metric = np.mean((y_pred - y_test) ** 2)
             metric_name = "MSE"
-        elif self.loss_function is CategoricalCrossEntropy:
+        elif loss_function is CategoricalCrossEntropy:
             y_pred_labels = np.argmax(y_pred, axis=1)
             y_test_labels = np.argmax(y_test, axis=1)
             metric = np.mean(y_pred_labels == y_test_labels)
             metric_name = "Accuracy"
-        elif self.loss_function is BinaryCrossEntropy:
+        elif loss_function is BinaryCrossEntropy:
             y_pred_labels = (y_pred > 0.5).astype(int)
             metric = np.mean(y_pred_labels == y_test)
             metric_name = "Accuracy"

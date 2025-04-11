@@ -14,6 +14,9 @@ class Optimizer(ABC):
         self.parameters = None
 
     def set_parameters(self, parameters: List[Tensor]):
+        """
+        Loads model's parameter into this optimizer.
+        """
         self.parameters = parameters
 
     @abstractmethod
