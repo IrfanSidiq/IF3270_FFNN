@@ -5,6 +5,11 @@ from src.loss_function import LossFunction
 from src.tensor import Tensor
 
 class RegularizedLoss:
+    loss_function: LossFunction
+    parameters: List[Tensor]
+    regularization_type: str
+    lambda_reg: float
+
     def __init__(self, loss_function: LossFunction, regularization_type: str = 'l2', lambda_reg: float = 0.001) -> None:
         if regularization_type != "l1" and regularization_type != "l2":
             raise RuntimeError(f"Regularization type '{regularization_type}' is not supported.\nSupported regularization type: 'l1', 'l2'")
@@ -15,10 +20,10 @@ class RegularizedLoss:
         self.lambda_reg = lambda_reg
 
     @property
-    def __name__(self):
+    def __name__(self) -> None:
         return f"{self.loss_function.__name__} with {self.regularization_type.upper()} Regularization"
     
-    def set_parameters(self, parameters: List[Tensor]):
+    def set_parameters(self, parameters: List[Tensor]) -> None:
         """
         Loads model's parameter into this regularizer.
         """

@@ -147,7 +147,7 @@ class FFNN:
         if isinstance(self.loss_function, RegularizedLoss):
             self.loss_function.backward(y_true, self.output.data)
     
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray, epochs: int = 10, batch_size: int = 32, verbose: bool = 0, validation_data: tuple = None) -> None:
+    def fit(self, X_train: np.ndarray, y_train: np.ndarray, epochs: int = 10, batch_size: int = 32, verbose: bool = 0, validation_data: tuple = None) -> List[Tuple]:
         """
         Trains the model with given training data.
         Input must be a 2D NumPy array, containing one or multiple data records for training.
@@ -202,6 +202,8 @@ class FFNN:
                 
                 print(f"-" * 20)
                 print(f"[{'#' * block}{'-' * (progress_bar_length - block)}] {progress * 100:.2f}%", end="")
+        
+        return self.__train_history
         
     def predict(self, X_test: np.ndarray) -> List[np.ndarray]:
         """
